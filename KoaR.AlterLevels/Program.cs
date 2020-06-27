@@ -9,11 +9,6 @@ namespace KoaR.AlterLevels
 {
     static class Program
     {
-        private readonly static Dictionary<uint, string> _simSpaces =
-            File.ReadLines("simspace.csv")
-            .Skip(1)
-            .ToDictionary(x => uint.Parse(x[..6], NumberStyles.HexNumber), x => x[7..]);
-
         static List<int> GetAllIndices(ReadOnlySpan<byte> data, ReadOnlySpan<byte> sequence)
         {
             var results = new List<int>();
@@ -31,6 +26,13 @@ namespace KoaR.AlterLevels
 
         static void Main(string[] args)
         {
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+
+            var simSpaces = File.ReadLines("simspace.csv")
+            .Skip(1)
+            .ToDictionary(x => uint.Parse(x[..6], NumberStyles.HexNumber), x => x[7..]);
+
             if (args.Length < 2)
             {
                 Console.WriteLine("Argument error, usage: path to save followed by level");
@@ -50,7 +52,7 @@ namespace KoaR.AlterLevels
             foreach (var spaceIx in spaces)
             {
                 var id = BitConverter.ToUInt32(saveData, spaceIx);
-                if (!_simSpaces.TryGetValue(id, out var name))
+                if (!simSpaces.TryGetValue(id, out var name))
                 {
                     continue;
                 }
