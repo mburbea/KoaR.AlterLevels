@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Force.Crc32;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 
 namespace KoaR.AlterLevels
@@ -27,7 +29,7 @@ namespace KoaR.AlterLevels
 
         static void Main(string[] args)
         {
-            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = 
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture =
                 Thread.CurrentThread.CurrentCulture = Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
 
             var simSpaces = File.ReadLines("simspace.csv")
@@ -45,8 +47,18 @@ namespace KoaR.AlterLevels
                 Console.WriteLine($"Could not parse {args[1]} as Byte");
                 return;
             }
-
             var saveData = File.ReadAllBytes(path);
+            bool isRemaster = BitConverter.ToInt32(saveData, 8) == 0;
+            if (isRemaster && !Path.GetFileNameWithoutExtension(path).StartsWith("svd_fmt_5_"))
+            {
+                Console.WriteLine($"Only users saves with names that start svd_fmt_5_ are supported");
+                return;
+            }
+            if (isRemaster && Encoding.Default.GetString(saveData, 6148, 4) == "zlib")
+            {
+                Console.WriteLine($"Compressed save files are not supported");
+                return;
+            }
             ReadOnlySpan<byte> sequence = new byte[] { 0x00, 0x89, 0xFB, 0x40, 0x01, 0x03 };
             ReadOnlySpan<byte> allOnes = new byte[] { 0x1, 0x1, 0x1, 0x1 };
             var spaces = GetAllIndices(saveData, sequence);
@@ -74,6 +86,14 @@ namespace KoaR.AlterLevels
             }
             Console.WriteLine($"Creating a backup: ${path}.bak");
             File.Copy(path, path + ".bak", overwrite: true);
+            if (isRemaster)
+            {
+                var fileCrc = Crc32Algorithm.Compute(saveData, 8, saveData.Length - 8);
+                var headerCrc = Crc32Algorithm.Compute(saveData, 8, 6 * 1024 - 8);
+                MemoryMarshal.Write(saveData, ref fileCrc);
+                MemoryMarshal.Write(saveData.AsSpan(4), ref headerCrc);
+            }
+
             File.WriteAllBytes(path, saveData);
         }
     }
